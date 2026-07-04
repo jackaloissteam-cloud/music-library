@@ -1,0 +1,29 @@
+{
+  "summary": "First-finish smoke tests on Local Music Indexer. All backend endpoints (config, seed-sample, scan, scan/status, tracks, stats, identify, PATCH tracks with apply_to_file, cover-art nano-banana, organize) responded 200 with correct shape. Frontend renders header, stats, table, filter, FixModal and CoverModal correctly.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/config → acoustid_configured=true, llm_configured=true, fpcalc_available=true",
+    "POST /api/seed-sample → 5 sample mp3s created",
+    "POST /api/scan + GET /api/scan/status → processed=5, running→finished",
+    "GET /api/stats → total=5, identified=2, unknown=2, low_confidence=1 (initial)",
+    "GET /api/tracks and ?status=unknown filter both return correct data",
+    "PATCH /api/tracks/{id} with apply_to_file=true updated DB (status→identified, source=manual) AND wrote ID3 tags to .mp3 (verified via mutagen re-read: title/artist/album applied)",
+    "POST /api/identify (bulk) returned 200 with {updated:0, errors:2, total_checked:2} for synthetic samples (expected — no AcoustID match)",
+    "POST /api/cover-art model=nano-banana returned 200 with valid data:image/png;base64 URL (~1.2MB payload)",
+    "POST /api/organize copied 4 tracks to /Artist/Album/Title.mp3 structure",
+    "Frontend loads at REACT_APP_BACKEND_URL, header 'LOCAL·MUSIC.INDEXER' visible",
+    "Status indicators: fpcalc: READY, acoustid: CONFIGURED, llm: ONLINE",
+    "SCAN flow via folder-path-input + scan-trigger-button populates 5-row table with correct stats",
+    "FixModal opens via table-row-fix-{id}, save-edits-button present",
+    "CoverModal opens via table-row-cover-{id}, model-selector-dropdown present",
+    "status-filter-select visible and functional"
+  ],
+  "failed": [],
+  "action_items": [
+    "Optional: verify gpt-image-1 model path (only nano-banana exercised due to first-finish latency budget). Recommend deferring to full testing pass.",
+    "Note: stats identified count becomes 3 after a manual PATCH promotes an unknown track — this is correct expected behavior, not a bug."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true
+}
