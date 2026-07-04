@@ -22,32 +22,30 @@ metadata, identify unknown tracks via AcoustID, browse/fix in a dashboard, renam
 ## Implemented (2026-01-04)
 - Backend endpoints
   - `GET /api/config` — capabilities probe (fpcalc/acoustid/llm)
-  - `POST /api/seed-sample` — generates 5 synthetic mp3s for demo
-  - `POST /api/scan` + `GET /api/scan/status` — background folder scan with progress state
+  - `POST /api/seed-sample` / `POST /api/seed-duplicates` — demo data
+  - `POST /api/scan` + `GET /api/scan/status` — background folder scan with progress state; now also computes chromaprint fingerprint per track
   - `GET /api/tracks?status=…` — list with status filter
   - `GET /api/stats` — dashboard counters
   - `PATCH /api/tracks/{id}` — edit metadata, optionally write back to file
   - `POST /api/identify` — bulk or targeted AcoustID lookup
   - `POST /api/cover-art` — Nano Banana / GPT Image 1 generation + optional embed to mp3
   - `POST /api/organize` — copy/move into `/Artist/Album/NN - Title.ext`
+  - `POST /api/duplicates/scan` — chromaprint hamming similarity grouping (adjustable threshold)
+  - `POST /api/duplicates/delete` — remove from DB and/or disk
   - `GET /api/audio/{id}` — audio preview stream (mp3)
 - Frontend
   - Dark Swiss / terminal aesthetic (Outfit + JetBrains Mono, orange #FF3300 / green #00FF66 accents)
   - Header w/ live capability status
-  - Stats grid (Total / Identified / Low-Confidence / Unknown)
-  - Scan controls + AcoustID toggle + Seed button
+  - Stats grid + tab switcher (LIBRARY / DUPLICATE FINDER)
+  - Scan controls + AcoustID toggle + Seed buttons
   - Filterable, dense track table with FIX + COVER actions
-  - FixModal (edit tags, optional write-to-file, AcoustID re-try)
-  - CoverModal (model picker, style hint, embed toggle, preview)
+  - FixModal / CoverModal (with model picker + style hint + embed toggle)
+  - **DuplicatesPanel** — threshold slider, grouped view with auto-selected non-keepers, DB-only or disk-delete
   - Toast notifications, scan-line progress bar
 
-## Environment
-- `/app/backend/.env`: `EMERGENT_LLM_KEY`, `ACOUSTID_API_KEY`, `MUSIC_LIBRARY_ROOT=/app/music_library`, `SAMPLE_MUSIC_ROOT=/app/sample_music`
-- Requires system packages: `libchromaprint-tools`, `ffmpeg` (installed in container)
-
 ## Testing
-- `/app/test_reports/iteration_1.json` — all endpoints and UI flows pass.
-- Note: synthetic sine-wave samples don't match AcoustID → expected `errors` on identify.
+- `/app/test_reports/iteration_1.json` — initial MVP (all pass)
+- `/app/test_reports/iteration_2.json` — Duplicate Finder feature (all pass)
 
 ## Backlog (P1)
 - Cover art embed for non-mp3 formats (flac/m4a)
