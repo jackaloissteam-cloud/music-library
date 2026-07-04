@@ -1,0 +1,151 @@
+{
+  "theme": "Dark",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "vibe": "Technical, Data-Dense, Objective, Terminal-Inspired",
+  "typography": {
+    "headings": {
+      "family": "Outfit",
+      "weights": ["300", "700", "900"],
+      "classes": "font-sans tracking-tight leading-none"
+    },
+    "body_and_data": {
+      "family": "JetBrains Mono",
+      "weights": ["400", "500"],
+      "classes": "font-mono leading-relaxed"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-bold tracking-tighter text-white",
+      "h2": "text-2xl sm:text-3xl font-semibold tracking-tight text-white",
+      "h3": "text-xl sm:text-2xl font-medium text-stone-200",
+      "body": "text-sm text-stone-300",
+      "table_data": "text-xs font-mono text-stone-300",
+      "labels": "text-xs uppercase tracking-[0.2em] font-mono text-stone-400"
+    }
+  },
+  "colors": {
+    "background": {
+      "default": "#000000",
+      "surface": "#0C0C0C",
+      "surface_hover": "#1A1A1A"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A8A29E",
+      "tertiary": "#78716C",
+      "inverse": "#000000"
+    },
+    "accents": {
+      "primary": "#FF3300", 
+      "primary_hover": "#E62E00",
+      "success": "#00FF66",
+      "warning": "#FFD700",
+      "error": "#FF0033"
+    },
+    "borders": {
+      "default": "#292524",
+      "active": "#FF3300"
+    }
+  },
+  "spacing_and_layout": {
+    "strategy": "The 'Control Room' Grid Protocol",
+    "container": "w-full max-w-[1600px] mx-auto px-6 py-8",
+    "grid_system": {
+      "base": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4",
+      "spans": {
+        "stats": "col-span-1",
+        "table": "col-span-full md:col-span-3 lg:col-span-4",
+        "activity_log": "col-span-1 md:col-span-1"
+      }
+    },
+    "surface_style": "Grid Borders (Technical Look). 1px solid border-stone-800, flat background, no shadows."
+  },
+  "components_strategy": {
+    "buttons": {
+      "primary": "bg-[#FF3300] text-white hover:bg-[#E62E00] rounded-none border border-[#FF3300] px-6 py-2 font-mono text-xs uppercase tracking-wider transition-colors",
+      "secondary": "bg-transparent text-white border border-stone-700 hover:border-stone-400 hover:bg-stone-900 rounded-none px-4 py-2 font-mono text-xs transition-colors",
+      "ghost": "bg-transparent text-stone-400 hover:text-white px-3 py-1 font-mono text-xs rounded-none transition-colors"
+    },
+    "table": {
+      "container": "w-full border-collapse border border-stone-800",
+      "header": "bg-[#0C0C0C] border-b border-stone-800 text-stone-400 font-mono text-xs uppercase tracking-wider text-left py-3 px-4",
+      "row": "border-b border-stone-800 hover:bg-[#1A1A1A] transition-colors",
+      "cell": "py-3 px-4 text-sm font-mono text-stone-300",
+      "status_badges": {
+        "identified": "text-[#00FF66] border border-[#00FF66]/30 bg-[#00FF66]/10 px-2 py-1 text-[10px] uppercase",
+        "unknown": "text-[#FF0033] border border-[#FF0033]/30 bg-[#FF0033]/10 px-2 py-1 text-[10px] uppercase",
+        "low_confidence": "text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] uppercase"
+      }
+    },
+    "forms_and_inputs": {
+      "input": "bg-[#0C0C0C] border border-stone-800 text-white rounded-none focus:border-[#FF3300] focus:ring-1 focus:ring-[#FF3300] px-4 py-2 font-mono text-sm placeholder-stone-600",
+      "select": "Shadcn Select component styled flat, square corners, dark theme override"
+    },
+    "modals": {
+      "dialog": "bg-[#0C0C0C] border border-stone-700 p-6 rounded-none shadow-2xl backdrop-blur-xl"
+    }
+  },
+  "page_sections": {
+    "header": {
+      "layout": "flex justify-between items-center py-6 border-b border-stone-800 mb-8",
+      "branding": "flex items-center gap-3 text-2xl font-bold tracking-tighter text-white",
+      "controls": "flex items-center gap-4"
+    },
+    "stats_dashboard": {
+      "layout": "grid grid-cols-2 md:grid-cols-4 gap-4 mb-8",
+      "card": "p-6 border border-stone-800 bg-[#0C0C0C] flex flex-col gap-2",
+      "metric_value": "text-4xl font-bold font-mono tracking-tighter text-white",
+      "metric_label": "text-xs font-mono text-stone-500 uppercase tracking-widest"
+    },
+    "main_content": {
+      "layout": "flex flex-col gap-6",
+      "toolbar": "flex justify-between items-center p-4 border border-stone-800 bg-[#0C0C0C]"
+    }
+  },
+  "interactions_and_motion": {
+    "hover_states": "Hard cuts on color changes (no slow fades) to emphasize tool functionality.",
+    "scan_progress": "Use an indeterminate neon loader (like a terminal cursor or green binary scanning effect) when folder scan is active.",
+    "row_click": "Highlight the entire table row in 5% white (#FFFFFF0D) when hovered to aid tracking."
+  },
+  "assets": {
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "style": "duotone for headers, regular for table actions",
+      "installation": "yarn add @phosphor-icons/react"
+    },
+    "images": [
+      {
+        "category": "empty_state_background",
+        "url": "https://images.unsplash.com/photo-1526394931762-90052e97b376?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwyfHx2aW55bCUyMHJlY29yZCUyMHBsYXllcnxlbnwwfHx8fDE3ODMxNjY1ODh8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Black turntable on brown wooden table - perfect for empty library state"
+      },
+      {
+        "category": "ai_cover_art_sample_1",
+        "url": "https://images.pexels.com/photos/15578335/pexels-photo-15578335.png?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Abstract artwork with dynamic warm colors - placeholder for Nano Banana generated cover"
+      },
+      {
+        "category": "ai_cover_art_sample_2",
+        "url": "https://images.unsplash.com/photo-1635169852185-37f90ac07189?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2ODh8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGFsYnVtJTIwY292ZXIlMjBhcnR8ZW58MHx8fHwxNzgzMTY2NTg4fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract painting swirl - placeholder for GPT Image 1 generated cover"
+      }
+    ]
+  },
+  "testing_attributes": {
+    "guideline": "All interactive elements MUST use descriptive data-testid attributes.",
+    "examples": [
+      "data-testid='scan-trigger-button'",
+      "data-testid='table-row-fix-action'",
+      "data-testid='auto-identify-bulk-button'",
+      "data-testid='cover-art-generate-button'",
+      "data-testid='model-selector-dropdown'",
+      "data-testid='folder-path-input'"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Ensure dark mode is forced on the layout application-wide.",
+    "Do NOT use typical rounded Shadcn Cards; strip borders, force square corners (rounded-none), and use pure 1px lines (border-stone-800).",
+    "Implement the table using pure HTML/Tailwind or heavily customized Shadcn Table for maximum data density (py-2 or py-3 instead of py-4).",
+    "Ensure the progress indicator utilizes a terminal-style look (e.g., green monospace text percentage and a blocky progress bar).",
+    "Integrate the 'Nano Banana vs GPT Image 1' selection inside a dense 'Fix Action' modal, utilizing the provided sample images as previews."
+  ]
+}
