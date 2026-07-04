@@ -24,3 +24,17 @@ export const IDS = {
   statLow: "stat-low-confidence",
   tableRow: (id) => `track-row-${id}`,
 };
+
+export const IDS_DUP = {
+  tabLibrary: "tab-library",
+  tabDuplicates: "tab-duplicates",
+  backBtn: "duplicates-back-button",
+  runBtn: "duplicates-run-button",
+  thresholdInput: "duplicates-threshold-input",
+  diskToggle: "duplicates-disk-delete-toggle",
+  deleteBtn: "duplicates-delete-selected-button",
+  seedDupBtn: "seed-duplicates-button",
+  group: (gid) => `duplicate-group-${gid}`,
+  dupRow: (id) => `duplicate-row-${id}`,
+  dupCheckbox: (id) => `duplicate-check-${id}`,
+};

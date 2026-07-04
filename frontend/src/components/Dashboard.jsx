@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { http } from "@/App";
-import { IDS } from "@/testIds";
+import { IDS, IDS_DUP } from "@/testIds";
 import { toast } from "sonner";
 import TrackTable from "@/components/TrackTable";
 import ScanControls from "@/components/ScanControls";
 import StatsRow from "@/components/StatsRow";
 import FixModal from "@/components/FixModal";
 import CoverModal from "@/components/CoverModal";
+import DuplicatesPanel from "@/components/DuplicatesPanel";
 
 export default function Dashboard() {
   const [config, setConfig] = useState(null);
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [openFix, setOpenFix] = useState(null);
   const [openCover, setOpenCover] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState("library"); // "library" | "duplicates"
   const pollRef = useRef(null);
 
   const loadAll = async (statusOverride) => {
@@ -202,56 +204,104 @@ export default function Dashboard() {
         {/* Stats */}
         <StatsRow stats={stats} />
 
-        {/* Toolbar */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 p-4 border border-[#292524] bg-[#0C0C0C] mb-0">
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-[#A8A29E]">
-            <span>FILTER</span>
-            <select
-              data-testid={IDS.statusFilter}
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              className="bg-black text-white border border-[#292524] rounded-none px-3 py-2 font-mono text-xs uppercase focus:outline-none focus:border-[#FF3300]"
-            >
-              <option value="all">ALL</option>
-              <option value="identified">IDENTIFIED</option>
-              <option value="low_confidence">LOW CONFIDENCE</option>
-              <option value="unknown">UNKNOWN</option>
-            </select>
+        {/* Tab switcher */}
+        <div className="flex items-center gap-0 border border-[#292524] bg-[#0C0C0C] mb-0 border-b-0">
+          <button
+            data-testid={IDS_DUP.tabLibrary}
+            onClick={() => setView("library")}
+            className={`px-6 py-3 font-mono text-[11px] uppercase tracking-widest transition-colors border-r border-[#292524] ${
+              view === "library"
+                ? "bg-[#FF3300] text-black font-bold"
+                : "text-[#A8A29E] hover:text-white"
+            }`}
+          >
+            ▤ LIBRARY
+          </button>
+          <button
+            data-testid={IDS_DUP.tabDuplicates}
+            onClick={() => setView("duplicates")}
+            className={`px-6 py-3 font-mono text-[11px] uppercase tracking-widest transition-colors border-r border-[#292524] ${
+              view === "duplicates"
+                ? "bg-[#FF3300] text-black font-bold"
+                : "text-[#A8A29E] hover:text-white"
+            }`}
+          >
+            ⧉ DUPLICATE FINDER
+          </button>
+          <div className="ml-auto pr-3">
             <button
-              data-testid={IDS.refreshBtn}
-              onClick={() => loadAll(filter)}
-              className="bg-transparent text-[#A8A29E] hover:text-white border border-[#292524] hover:border-[#A8A29E] rounded-none px-3 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors"
+              data-testid={IDS_DUP.seedDupBtn}
+              onClick={async () => {
+                try {
+                  const r = await http.post("/seed-duplicates");
+                  toast.success(`Seeded ${r.data.count} duplicate copies · re-scan to pick them up`);
+                } catch (e) {
+                  toast.error("Seed duplicates failed");
+                }
+              }}
+              className="text-[10px] uppercase tracking-widest text-[#78716C] hover:text-white transition-colors px-3 py-2"
             >
-              ↻ REFRESH
-            </button>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              data-testid={IDS.identifyAllBtn}
-              onClick={identifyAll}
-              disabled={busy || !config?.acoustid_configured}
-              className="bg-transparent text-white border border-[#FF3300] hover:bg-[#FF3300] hover:text-black rounded-none px-4 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              ⌕ AUTO-IDENTIFY UNKNOWNS
-            </button>
-            <button
-              data-testid={IDS.organizeBtn}
-              onClick={organize}
-              disabled={busy}
-              className="bg-[#FF3300] text-black border border-[#FF3300] hover:bg-[#E62E00] rounded-none px-4 py-2 font-mono text-[11px] uppercase tracking-wider font-bold transition-colors disabled:opacity-30"
-            >
-              ▶ ORGANIZE LIBRARY
+              + SEED DUPES
             </button>
           </div>
         </div>
 
-        {/* Table */}
-        <TrackTable
-          tracks={tracks}
-          loading={loading}
-          onFix={(t) => setOpenFix(t)}
-          onCover={(t) => setOpenCover(t)}
-        />
+        {view === "library" ? (
+          <>
+            {/* Toolbar */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 p-4 border border-[#292524] bg-[#0C0C0C] mb-0">
+              <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-[#A8A29E]">
+                <span>FILTER</span>
+                <select
+                  data-testid={IDS.statusFilter}
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="bg-black text-white border border-[#292524] rounded-none px-3 py-2 font-mono text-xs uppercase focus:outline-none focus:border-[#FF3300]"
+                >
+                  <option value="all">ALL</option>
+                  <option value="identified">IDENTIFIED</option>
+                  <option value="low_confidence">LOW CONFIDENCE</option>
+                  <option value="unknown">UNKNOWN</option>
+                </select>
+                <button
+                  data-testid={IDS.refreshBtn}
+                  onClick={() => loadAll(filter)}
+                  className="bg-transparent text-[#A8A29E] hover:text-white border border-[#292524] hover:border-[#A8A29E] rounded-none px-3 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors"
+                >
+                  ↻ REFRESH
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  data-testid={IDS.identifyAllBtn}
+                  onClick={identifyAll}
+                  disabled={busy || !config?.acoustid_configured}
+                  className="bg-transparent text-white border border-[#FF3300] hover:bg-[#FF3300] hover:text-black rounded-none px-4 py-2 font-mono text-[11px] uppercase tracking-wider transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  ⌕ AUTO-IDENTIFY UNKNOWNS
+                </button>
+                <button
+                  data-testid={IDS.organizeBtn}
+                  onClick={organize}
+                  disabled={busy}
+                  className="bg-[#FF3300] text-black border border-[#FF3300] hover:bg-[#E62E00] rounded-none px-4 py-2 font-mono text-[11px] uppercase tracking-wider font-bold transition-colors disabled:opacity-30"
+                >
+                  ▶ ORGANIZE LIBRARY
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <TrackTable
+              tracks={tracks}
+              loading={loading}
+              onFix={(t) => setOpenFix(t)}
+              onCover={(t) => setOpenCover(t)}
+            />
+          </>
+        ) : (
+          <DuplicatesPanel onBack={() => setView("library")} onChanged={() => loadAll(filter)} />
+        )}
 
         {/* Footer */}
         <footer className="mt-10 py-6 border-t border-[#292524] text-[10px] uppercase tracking-[0.3em] text-[#78716C] flex justify-between">

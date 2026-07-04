@@ -86,6 +86,8 @@ class Track(BaseModel):
     musicbrainz_recording_id: Optional[str] = None
     cover_data_url: Optional[str] = None
     error: Optional[str] = None
+    fingerprint: Optional[str] = None
+    fp_duration: Optional[float] = None
     updated_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -282,6 +284,49 @@ async def _acoustid_lookup(path: Path) -> Optional[dict]:
         return {"error": str(e)}
 
 
+async def _compute_fingerprint(path: Path) -> tuple[Optional[str], Optional[float]]:
+    """Return (fingerprint_string, duration_seconds) via chromaprint fpcalc."""
+    if not shutil.which("fpcalc"):
+        return None, None
+
+    def _work():
+        try:
+            import acoustid
+            duration, fp = acoustid.fingerprint_file(str(path))
+            if isinstance(fp, bytes):
+                fp = fp.decode("ascii", errors="ignore")
+            return duration, fp
+        except Exception as e:
+            logger.warning("fingerprint failed for %s: %s", path, e)
+            return None, None
+
+    dur, fp = await asyncio.to_thread(_work)
+    return fp, (float(dur) if dur else None)
+
+
+def _fp_hamming_similarity(fp_a: str, fp_b: str) -> float:
+    """Similarity in [0,1] via chromaprint hamming distance on aligned prefix."""
+    if not fp_a or not fp_b:
+        return 0.0
+    try:
+        import chromaprint
+        arr_a, _ = chromaprint.decode_fingerprint(fp_a.encode("ascii"))
+        arr_b, _ = chromaprint.decode_fingerprint(fp_b.encode("ascii"))
+        if not arr_a or not arr_b:
+            return 0.0
+        n = min(len(arr_a), len(arr_b))
+        if n == 0:
+            return 0.0
+        total_bits = n * 32
+        diff_bits = 0
+        for i in range(n):
+            diff_bits += bin(arr_a[i] ^ arr_b[i]).count("1")
+        return 1.0 - (diff_bits / total_bits)
+    except Exception as e:
+        logger.warning("fp compare failed: %s", e)
+        return 0.0
+
+
 async def _scan_folder(folder: Path, use_acoustid: bool):
     global SCAN_STATE
     SCAN_STATE = ScanState(
@@ -304,6 +349,8 @@ async def _scan_folder(folder: Path, use_acoustid: bool):
             acoustid_id = None
             mbid = None
             error = None
+            # Compute fingerprint for every track (used for duplicate detection)
+            fp_str, fp_dur = await _compute_fingerprint(fp)
             if use_acoustid and status in ("unknown", "low_confidence"):
                 res = await _acoustid_lookup(fp)
                 if res and "error" not in res and res.get("score", 0) > 0:
@@ -337,6 +384,8 @@ async def _scan_folder(folder: Path, use_acoustid: bool):
                 acoustid_id=acoustid_id,
                 musicbrainz_recording_id=mbid,
                 error=error,
+                fingerprint=fp_str,
+                fp_duration=fp_dur,
             )
             doc = track.model_dump()
             await db.tracks.insert_one(doc)
@@ -692,6 +741,150 @@ async def stream_audio(track_id: str):
     return FileResponse(str(p), media_type="audio/mpeg", filename=p.name)
 
 
+# ---------------------------------------------------------------------------
+# Duplicate detection
+# ---------------------------------------------------------------------------
+class DuplicateScanRequest(BaseModel):
+    threshold: float = 0.92  # similarity threshold (0..1)
+
+
+class DuplicateDeleteRequest(BaseModel):
+    track_ids: List[str]
+    delete_from_disk: bool = False
+
+
+@api_router.post("/duplicates/scan")
+async def scan_duplicates(req: DuplicateScanRequest):
+    """Group tracks whose chromaprint fingerprints are near-identical.
+    Also computes fingerprints on-the-fly for tracks that don't have one yet.
+    """
+    docs = await db.tracks.find({}, {"_id": 0}).to_list(5000)
+    # Fill missing fingerprints
+    missing = [d for d in docs if not d.get("fingerprint")]
+    for d in missing:
+        p = Path(d["path"])
+        if not p.exists():
+            continue
+        fp, dur = await _compute_fingerprint(p)
+        if fp:
+            await db.tracks.update_one(
+                {"id": d["id"]},
+                {"$set": {"fingerprint": fp, "fp_duration": dur}},
+            )
+            d["fingerprint"] = fp
+            d["fp_duration"] = dur
+
+    valid = [d for d in docs if d.get("fingerprint")]
+    # Union-find clustering
+    parent = list(range(len(valid)))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    threshold = max(0.5, min(1.0, req.threshold))
+    for i in range(len(valid)):
+        for j in range(i + 1, len(valid)):
+            # Quick duration prefilter (±10s)
+            da = valid[i].get("fp_duration") or valid[i].get("duration") or 0
+            db_ = valid[j].get("fp_duration") or valid[j].get("duration") or 0
+            if da and db_ and abs(da - db_) > 10:
+                continue
+            sim = _fp_hamming_similarity(valid[i]["fingerprint"], valid[j]["fingerprint"])
+            if sim >= threshold:
+                union(i, j)
+
+    groups: dict[int, list[dict]] = {}
+    for idx, d in enumerate(valid):
+        root = find(idx)
+        groups.setdefault(root, []).append(d)
+
+    dup_groups = []
+    for root, items in groups.items():
+        if len(items) < 2:
+            continue
+        # Pick "keeper" heuristic: highest confidence, then largest file
+        items_sorted = sorted(
+            items,
+            key=lambda x: (x.get("confidence") or 0.0, x.get("size_bytes") or 0),
+            reverse=True,
+        )
+        # Compute pairwise similarity against the keeper for display
+        keeper = items_sorted[0]
+        entries = []
+        for it in items_sorted:
+            sim = 1.0 if it["id"] == keeper["id"] else _fp_hamming_similarity(
+                keeper["fingerprint"], it["fingerprint"]
+            )
+            entries.append({
+                "id": it["id"],
+                "path": it["path"],
+                "filename": it["filename"],
+                "title": it.get("title"),
+                "artist": it.get("artist"),
+                "album": it.get("album"),
+                "duration": it.get("duration"),
+                "size_bytes": it.get("size_bytes"),
+                "confidence": it.get("confidence") or 0.0,
+                "status": it.get("status"),
+                "similarity": round(sim, 4),
+                "is_keeper": it["id"] == keeper["id"],
+            })
+        dup_groups.append({
+            "group_id": f"grp_{root}",
+            "keeper_id": keeper["id"],
+            "count": len(items),
+            "tracks": entries,
+        })
+
+    dup_groups.sort(key=lambda g: g["count"], reverse=True)
+    return {
+        "threshold": threshold,
+        "total_tracks_analyzed": len(valid),
+        "tracks_missing_fingerprint": len(docs) - len(valid),
+        "group_count": len(dup_groups),
+        "duplicate_file_count": sum(g["count"] - 1 for g in dup_groups),
+        "groups": dup_groups,
+    }
+
+
+@api_router.post("/duplicates/delete")
+async def delete_duplicates(req: DuplicateDeleteRequest):
+    """Delete selected duplicate tracks from DB and optionally from disk."""
+    docs = await db.tracks.find(
+        {"id": {"$in": req.track_ids}}, {"_id": 0}
+    ).to_list(1000)
+    disk_removed = 0
+    disk_errors = []
+    if req.delete_from_disk:
+        for d in docs:
+            p = Path(d["path"])
+            try:
+                if p.exists():
+                    p.unlink()
+                    disk_removed += 1
+            except Exception as e:
+                disk_errors.append({"path": str(p), "error": str(e)})
+    res = await db.tracks.delete_many({"id": {"$in": req.track_ids}})
+    return {
+        "removed_from_db": res.deleted_count,
+        "removed_from_disk": disk_removed,
+        "disk_errors": disk_errors,
+    }
+
+
+# ---------------------------------------------------------------------------
+# (audio route already registered above)
+# ---------------------------------------------------------------------------
+
+
 @api_router.post("/seed-sample")
 async def seed_sample():
     """Create a small synthetic sample library for demo/testing."""
@@ -757,7 +950,7 @@ async def seed_sample():
                     "-f",
                     "lavfi",
                     "-i",
-                    f"sine=frequency={s['freq']}:duration=2",
+                    f"sine=frequency={s['freq']}:duration=8",
                     "-ac",
                     "1",
                     "-b:a",
@@ -789,6 +982,25 @@ async def seed_sample():
             easy.save(str(target))
         created.append(s["name"])
     return {"created": created, "root": str(root), "count": len(created)}
+
+
+@api_router.post("/seed-duplicates")
+async def seed_duplicates():
+    """Create obvious duplicates by copying existing sample files with new names."""
+    root = Path(SAMPLE_MUSIC_ROOT)
+    root.mkdir(parents=True, exist_ok=True)
+    pairs = [
+        ("01 - midnight_drive.mp3", "midnight_drive_COPY.mp3"),
+        ("02 - crystal_static.mp3", "crystal_static (1).mp3"),
+    ]
+    created = []
+    for src_name, dst_name in pairs:
+        src = root / src_name
+        dst = root / dst_name
+        if src.exists() and not dst.exists():
+            shutil.copy2(str(src), str(dst))
+            created.append(dst_name)
+    return {"created": created, "count": len(created)}
 
 
 # ---------------------------------------------------------------------------

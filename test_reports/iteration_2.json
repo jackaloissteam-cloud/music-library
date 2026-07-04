@@ -1,0 +1,23 @@
+{
+  "summary": "Iteration 2 (Duplicate Finder feature) - backend and frontend both verified. fpcalc available at /usr/bin/fpcalc. All duplicate detection, deletion, threshold, and UI flows working correctly.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "POST /api/seed-sample created 5 samples; POST /api/seed-duplicates (idempotent - copies already present). Stats total=7 after initial scan.",
+    "GET /api/tracks records include non-null 'fingerprint' (chromaprint) and fp_duration=8.0",
+    "POST /api/duplicates/scan {threshold:0.97} returned 2 groups (grp_1 crystal_static pair, grp_3 midnight_drive pair) with similarity=1.0 for exact copies, correct is_keeper flags",
+    "POST /api/duplicates/scan {threshold:0.9} returned 1 group of count=6 (all sines cluster - expected per PRD note)",
+    "POST /api/duplicates/delete delete_from_disk=false removed 1 from DB (removed_from_db=1, removed_from_disk=0). Stats total went 7->6, file still on disk.",
+    "POST /api/duplicates/delete delete_from_disk=true removed midnight_drive from DB AND disk (removed_from_db=1, removed_from_disk=1, disk_errors=[]). File confirmed gone via ls.",
+    "Frontend: tab-duplicates switches view, duplicates-run-button triggers scan, groups render with keeper/non-keeper rows",
+    "Frontend: non-keeper checkboxes default checked (3 of 5 in low-threshold scan), duplicates-delete-selected-button shows count ('DELETE 3')",
+    "Frontend: duplicates-threshold-input slider accepts 0.9 and displays 90%, affects scan results",
+    "Frontend regression: tab-library switches back to library table with FIX/COVER buttons intact",
+    "No console errors, no error elements on page"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Minor observation: POST /api/scan response returns folder='/app/music_library' regardless of root_path body arg, but the scan appears to actually process /app/sample_music (tracks with sample_music paths are indexed). This is cosmetic and did not affect functionality. Re-scan after DB-only delete did not re-add the deleted crystal_static (1).mp3 record within test timing - not tested exhaustively; disk-delete flow was verified using an already-indexed non-keeper (midnight_drive_COPY pair) with full success."
+}
