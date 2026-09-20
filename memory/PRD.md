@@ -47,6 +47,12 @@ metadata, identify unknown tracks via AcoustID, browse/fix in a dashboard, renam
 - `/app/test_reports/iteration_1.json` — initial MVP (all pass)
 - `/app/test_reports/iteration_2.json` — Duplicate Finder feature (all pass)
 
+## Iteration 3 (2026-09-20)
+- **Smart Playlist Generator** — LLM-basiert (Claude Sonnet 4.5 via Emergent LLM key). Endpoint `POST /api/playlists/generate` mit optionalem `seed_track_id` + `prompt` + `count`. Speichert Playlists in `db.playlists`. Endpoints: GET list, GET detail, DELETE, GET `.../export.m3u` (Winamp/VLC/foobar-kompatibel)
+- **Persistent Mini-Player** — HTML5-Audio-Bar unten am Screen. Streamt via `/api/audio/{id}`, Play/Pause/Next/Prev, Progress-Bar (klickbar für Seek), Cover-Thumbnail, Queue-Info
+- **Neuer Tab** SMART PLAYLISTS mit Generator-Form (Mood/Brief, Seed-Track-Select, Count, Name) und Playlist-Cards mit Expand-to-tracks, Play/M3U/Delete-Actions
+- Env-Fix: fpcalc + ffmpeg neu installiert (waren ephemer verloren)
+
 ## Backlog (P1)
 - Cover art embed for non-mp3 formats (flac/m4a)
 - Live progress via WebSocket / SSE instead of polling

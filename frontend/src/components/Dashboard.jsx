@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { http } from "@/App";
-import { IDS, IDS_DUP } from "@/testIds";
+import { IDS, IDS_DUP, IDS_PL } from "@/testIds";
 import { toast } from "sonner";
 import TrackTable from "@/components/TrackTable";
 import ScanControls from "@/components/ScanControls";
@@ -8,6 +8,8 @@ import StatsRow from "@/components/StatsRow";
 import FixModal from "@/components/FixModal";
 import CoverModal from "@/components/CoverModal";
 import DuplicatesPanel from "@/components/DuplicatesPanel";
+import PlaylistsPanel from "@/components/PlaylistsPanel";
+import PlayerBar from "@/components/PlayerBar";
 
 export default function Dashboard() {
   const [config, setConfig] = useState(null);
@@ -19,7 +21,10 @@ export default function Dashboard() {
   const [openFix, setOpenFix] = useState(null);
   const [openCover, setOpenCover] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [view, setView] = useState("library"); // "library" | "duplicates"
+  const [view, setView] = useState("library"); // "library" | "duplicates" | "playlists"
+  const [playerQueue, setPlayerQueue] = useState(null);
+  const [playerIndex, setPlayerIndex] = useState(0);
+  const [playerName, setPlayerName] = useState("");
   const pollRef = useRef(null);
 
   const loadAll = async (statusOverride) => {
@@ -228,6 +233,17 @@ export default function Dashboard() {
           >
             ⧉ DUPLICATE FINDER
           </button>
+          <button
+            data-testid={IDS_PL.tabPlaylists}
+            onClick={() => setView("playlists")}
+            className={`px-6 py-3 font-mono text-[11px] uppercase tracking-widest transition-colors border-r border-[#292524] ${
+              view === "playlists"
+                ? "bg-[#FF3300] text-black font-bold"
+                : "text-[#A8A29E] hover:text-white"
+            }`}
+          >
+            ◈ SMART PLAYLISTS
+          </button>
           <div className="ml-auto pr-3">
             <button
               data-testid={IDS_DUP.seedDupBtn}
@@ -299,8 +315,13 @@ export default function Dashboard() {
               onCover={(t) => setOpenCover(t)}
             />
           </>
-        ) : (
+        ) : view === "duplicates" ? (
           <DuplicatesPanel onBack={() => setView("library")} onChanged={() => loadAll(filter)} />
+        ) : (
+          <PlaylistsPanel
+            tracks={tracks}
+            onPlay={(list, idx, name) => { setPlayerQueue(list); setPlayerIndex(idx); setPlayerName(name); }}
+          />
         )}
 
         {/* Footer */}
@@ -324,6 +345,15 @@ export default function Dashboard() {
           track={openCover}
           onClose={() => setOpenCover(null)}
           onGenerate={generateCover}
+        />
+      )}
+      {playerQueue && (
+        <PlayerBar
+          queue={playerQueue}
+          index={playerIndex}
+          queueName={playerName}
+          onIndexChange={setPlayerIndex}
+          onClose={() => setPlayerQueue(null)}
         />
       )}
     </div>

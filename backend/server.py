@@ -885,6 +885,157 @@ async def delete_duplicates(req: DuplicateDeleteRequest):
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Smart Playlists (LLM-curated)
+# ---------------------------------------------------------------------------
+class PlaylistGenerateRequest(BaseModel):
+    seed_track_id: Optional[str] = None
+    prompt: Optional[str] = None  # e.g. "melancholic late-night drive"
+    count: int = 15
+    name: Optional[str] = None
+
+
+@api_router.post("/playlists/generate")
+async def generate_playlist(req: PlaylistGenerateRequest):
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(400, "EMERGENT_LLM_KEY not configured")
+
+    # Build compact library snapshot for the LLM
+    docs = await db.tracks.find(
+        {"status": {"$in": ["identified", "low_confidence"]}}, {"_id": 0}
+    ).to_list(2000)
+    if len(docs) < 2:
+        raise HTTPException(400, "Need at least 2 identified tracks in library")
+
+    seed = None
+    if req.seed_track_id:
+        seed = next((d for d in docs if d["id"] == req.seed_track_id), None)
+
+    catalog = [
+        {
+            "id": d["id"],
+            "title": d.get("title") or d["filename"],
+            "artist": d.get("artist") or "Unknown",
+            "album": d.get("album") or "",
+            "genre": d.get("genre") or "",
+            "year": d.get("year") or "",
+        }
+        for d in docs
+    ]
+
+    import json as _json
+    seed_str = (
+        f"Seed track: {seed['artist']} — {seed['title']} (album: {seed.get('album') or 'n/a'}, "
+        f"genre: {seed.get('genre') or 'n/a'})"
+        if seed else "No seed track."
+    )
+    mood_str = f"Mood/brief: {req.prompt}" if req.prompt else "No extra mood brief."
+
+    system = (
+        "You are a world-class music curator. Given a JSON catalog of tracks the user OWNS, "
+        "build a coherent playlist ONLY from those tracks. Consider genre, era, energy, mood. "
+        "Output STRICT JSON: {\"name\":\"...\",\"description\":\"...\",\"track_ids\":[\"uuid\", ...]}. "
+        "NEVER invent track IDs. Only use IDs from the provided catalog. "
+        f"Return exactly {req.count} track IDs (or fewer if catalog is smaller)."
+    )
+    user_msg = (
+        f"{seed_str}\n{mood_str}\n\n"
+        f"Catalog (JSON):\n{_json.dumps(catalog)[:60000]}\n\n"
+        f"Return the JSON now."
+    )
+
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    chat = LlmChat(
+        api_key=EMERGENT_LLM_KEY,
+        session_id=f"playlist-{uuid.uuid4()}",
+        system_message=system,
+    ).with_model("anthropic", "claude-sonnet-4-5")
+
+    try:
+        raw = await chat.send_message(UserMessage(text=user_msg))
+    except Exception as e:
+        raise HTTPException(502, f"LLM error: {e}") from e
+
+    # Extract JSON from response
+    text = raw if isinstance(raw, str) else str(raw)
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if not m:
+        raise HTTPException(502, "LLM did not return JSON")
+    try:
+        parsed = _json.loads(m.group(0))
+    except Exception as e:
+        raise HTTPException(502, f"LLM JSON parse failed: {e}") from e
+
+    valid_ids = {d["id"] for d in docs}
+    track_ids = [tid for tid in (parsed.get("track_ids") or []) if tid in valid_ids]
+    if not track_ids:
+        raise HTTPException(502, "LLM produced no valid track IDs")
+
+    playlist = {
+        "id": str(uuid.uuid4()),
+        "name": req.name or parsed.get("name") or "AI Mix",
+        "description": parsed.get("description") or "",
+        "track_ids": track_ids,
+        "seed_track_id": req.seed_track_id,
+        "prompt": req.prompt,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.playlists.insert_one(playlist.copy())
+    return playlist
+
+
+@api_router.get("/playlists")
+async def list_playlists():
+    docs = await db.playlists.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    return docs
+
+
+@api_router.get("/playlists/{playlist_id}")
+async def get_playlist(playlist_id: str):
+    pl = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    if not pl:
+        raise HTTPException(404, "playlist not found")
+    tracks = await db.tracks.find(
+        {"id": {"$in": pl["track_ids"]}}, {"_id": 0}
+    ).to_list(1000)
+    # Preserve order
+    order = {tid: i for i, tid in enumerate(pl["track_ids"])}
+    tracks.sort(key=lambda t: order.get(t["id"], 999))
+    pl["tracks"] = tracks
+    return pl
+
+
+@api_router.delete("/playlists/{playlist_id}")
+async def delete_playlist(playlist_id: str):
+    r = await db.playlists.delete_one({"id": playlist_id})
+    return {"deleted": r.deleted_count}
+
+
+@api_router.get("/playlists/{playlist_id}/export.m3u")
+async def export_m3u(playlist_id: str):
+    from fastapi.responses import PlainTextResponse
+    pl = await db.playlists.find_one({"id": playlist_id}, {"_id": 0})
+    if not pl:
+        raise HTTPException(404, "playlist not found")
+    tracks = await db.tracks.find(
+        {"id": {"$in": pl["track_ids"]}}, {"_id": 0}
+    ).to_list(1000)
+    order = {tid: i for i, tid in enumerate(pl["track_ids"])}
+    tracks.sort(key=lambda t: order.get(t["id"], 999))
+
+    lines = ["#EXTM3U", f"#PLAYLIST:{pl['name']}"]
+    for t in tracks:
+        dur = int(t.get("duration") or 0)
+        artist = t.get("artist") or "Unknown"
+        title = t.get("title") or t.get("filename")
+        lines.append(f"#EXTINF:{dur},{artist} - {title}")
+        lines.append(t["path"])
+    return PlainTextResponse(
+        "\n".join(lines),
+        headers={"Content-Disposition": f'attachment; filename="{pl["name"]}.m3u"'},
+    )
+
+
 @api_router.post("/seed-sample")
 async def seed_sample():
     """Create a small synthetic sample library for demo/testing."""

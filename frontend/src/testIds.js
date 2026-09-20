@@ -38,3 +38,20 @@ export const IDS_DUP = {
   dupRow: (id) => `duplicate-row-${id}`,
   dupCheckbox: (id) => `duplicate-check-${id}`,
 };
+
+export const IDS_PL = {
+  tabPlaylists: "tab-playlists",
+  generateBtn: "playlist-generate-button",
+  promptInput: "playlist-prompt-input",
+  seedSelect: "playlist-seed-select",
+  countInput: "playlist-count-input",
+  nameInput: "playlist-name-input",
+  playlistCard: (id) => `playlist-card-${id}`,
+  playBtn: (id) => `playlist-play-${id}`,
+  exportBtn: (id) => `playlist-export-${id}`,
+  deleteBtn: (id) => `playlist-delete-${id}`,
+  playerBar: "persistent-player-bar",
+  playerPlay: "player-play-pause",
+  playerNext: "player-next",
+  playerPrev: "player-prev",
+};
